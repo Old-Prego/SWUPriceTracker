@@ -45,7 +45,7 @@ function downloadAndSaveCSV(url, filename) {
             file.on('finish', () => {
                 file.close();
                 console.log(`|o| [o] |o| CSV saved to ${filename} |o| [o] |o|`);
-                resolve(filePath); // ✅ Return the local path
+                resolve(filePath); // Return the local path
             });
         }).on('error', (err) => {
             if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
@@ -151,6 +151,8 @@ function displayAndPrompt(items) {
             return;
         }
         await mergeCSVFiles(downloadedFiles, mergedFilePath);
+
+        deleteFiles(downloadedFiles)
     } else {
         displayAndPrompt(groupList.results);
     }
@@ -190,4 +192,19 @@ async function mergeCSVFiles(filePaths, outputFilePath) {
 
     writeStream.end();
     console.log(`Merged and normalized CSV saved to ${outputFilePath}`);
+}
+
+
+function deleteFiles(filePaths) {
+    for (const filePath of filePaths) {
+        try {
+            if (fs.existsSync(filePath)) {
+                fs.unlinkSync(filePath);
+            } else {
+                console.warn(`File not found: ${filePath}`);
+            }
+        } catch (error) {
+            console.error(`❌ Failed to delete ${filePath}: ${error.message}`);
+        }
+    }
 }
