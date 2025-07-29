@@ -8,9 +8,11 @@ const { format } = require('date-fns');
 // Constants
 const API_URL = 'https://tcgcsv.com/tcgplayer/79/groups';
 const AUTO_GROUPS = [
-    24387, // Secrets of Power
-    24386, // Intro Battle: Hoth
-    24385  // Convention Exclusive
+    23405, // Spark of Rebellion
+    23488, // Shadows of the Galaxy
+    23597,  // Twilight of the Republic
+    23956, // Jump to Lightspeed
+    24279 // Legends of the Force
 ];
 
 // Ensure fetch is available
@@ -105,7 +107,7 @@ function displayAndPrompt(items) {
             const groupName = group.name.replace(/[^a-zA-Z0-9]/g, '_');
             const today = format(new Date(), 'yyyyMMdd');
             const filename = `${groupName}_Prices_${today}.csv`;
-            const downloadUrl = `https://tcgcsv.com/tcgplayer/79/${groupId}/full`;
+            const downloadUrl = `https://tcgcsv.com/tcgplayer/79/${groupId}/ProductsAndPrices.csv`;
 
             await downloadAndSaveCSV(downloadUrl, filename);
         }
