@@ -1,0 +1,18 @@
+To Do:
+
+	New trade workbook
+	Dynamic file reference (to csv files)
+	combobox lookup to names, allow for multi match (?)
+	Display image in cell
+	
+
+OR TO DO:
+
+	Learn how to web dev again
+	Learn how to host a server
+	Figure out how to create automated task on sever if not hosting the server myself
+	Build simple form design with combobox entry
+	Options: Hyperspace/prestige/foil
+	Display images based on links
+	Re-learn jQuery
+	God damn learn stupid ass jQuery Mobile too

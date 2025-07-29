@@ -204,7 +204,7 @@ function deleteFiles(filePaths) {
                 console.warn(`File not found: ${filePath}`);
             }
         } catch (error) {
-            console.error(`❌ Failed to delete ${filePath}: ${error.message}`);
+            console.error(`Failed to delete ${filePath}: ${error.message}`);
         }
     }
 }
