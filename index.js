@@ -15,13 +15,16 @@ const AUTO_GROUPS = [
     24279 // Legends of the Force
 ];
 
+const OUTPUT_DIR = path.join(__dirname, 'data');
+
 // Ensure fetch is available
 const fetch = global.fetch || require('node-fetch');
 
 // Download CSV directly from URL and save
 function downloadAndSaveCSV(url, filename) {
     return new Promise((resolve, reject) => {
-        const file = fs.createWriteStream(filename);
+        const filePath = path.join(OUTPUT_DIR, filename);
+        const file = fs.createWriteStream(filePath);
         https.get(url, (response) => {
             if (response.statusCode !== 200) {
                 reject(new Error(`Failed to get '${url}' (${response.statusCode})`));
