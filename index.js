@@ -4,6 +4,7 @@ const readline = require('readline');
 const path = require('path');
 const https = require('https');
 const { format } = require('date-fns');
+const csvParser = require('csv-parser');
 
 // Constants
 const API_URL = 'https://tcgcsv.com/tcgplayer/79/groups';
@@ -16,6 +17,16 @@ const AUTO_GROUPS = [
 ];
 
 const OUTPUT_DIR = path.join(__dirname, 'data');
+const RESULTS_DIR = path.join(__dirname, 'results');
+
+// Ensure output directory exists
+if (!fs.existsSync(OUTPUT_DIR)) {
+    fs.mkdirSync(OUTPUT_DIR);
+}
+
+if (!fs.existsSync(RESULTS_DIR)) {
+    fs.mkdirSync(RESULTS_DIR);
+}
 
 // Ensure fetch is available
 const fetch = global.fetch || require('node-fetch');
@@ -33,15 +44,16 @@ function downloadAndSaveCSV(url, filename) {
             response.pipe(file);
             file.on('finish', () => {
                 file.close();
-                console.log(`✅ CSV saved to ${filename}`);
-                resolve();
+                console.log(`|o| [o] |o| CSV saved to ${filename} |o| [o] |o|`);
+                resolve(filePath); // ✅ Return the local path
             });
         }).on('error', (err) => {
-            fs.unlinkSync(filename);
+            if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
             reject(err);
         });
     });
 }
+
 
 function askMode() {
     return new Promise(resolve => {
@@ -50,9 +62,11 @@ function askMode() {
             output: process.stdout
         });
 
-        rl.question('Choose mode: (1) CLI Selection (2) Auto Process List: ', answer => {
+        rl.question('Choose mode: (1) CLI Selection (2) Auto Process List (3) All Groups: ', answer => {
             rl.close();
-            resolve(answer === '2' ? 'auto' : 'cli');
+            if (answer === '2') resolve('auto');
+            else if (answer === '3') resolve('all');
+            else resolve('cli');
         });
     });
 }
@@ -95,31 +109,85 @@ function displayAndPrompt(items) {
 }
 
 (async () => {
-    console.log('⚙️ Starting SWU Price Tracker...');
+    console.log('>o< >o< >o< Starting SWU Price Tracker >o< >o< >o<');
     const mode = await askMode();
 
-    if (mode === 'auto') {
-        for (const groupId of AUTO_GROUPS) {
-            const groupList = await fetch(API_URL).then(res => res.json());
-            const group = groupList.results.find(g => g.groupId === groupId);
-            if (!group) {
-                console.warn(`Group ID ${groupId} not found.`);
-                continue;
-            }
+    const groupList = await fetch(API_URL).then(res => res.json());
+    if (!groupList || !groupList.results.length) {
+        console.log('No results found.');
+        return;
+    }
 
+    if (mode === 'auto' || mode === 'all') {
+        const groupsToProcess = mode === 'auto'
+            ? groupList.results.filter(g => AUTO_GROUPS.includes(g.groupId))
+            : groupList.results;
+
+        const downloadedFiles = [];
+        const now = new Date();
+        const dateStr = format(now, 'yyyyMMdd');
+        const dateTimeStr = format(now, 'yyyyMMdd_HHmm');
+
+        for (const group of groupsToProcess) {
             const groupName = group.name.replace(/[^a-zA-Z0-9]/g, '_');
-            const today = format(new Date(), 'yyyyMMdd');
-            const filename = `${groupName}_Prices_${today}.csv`;
-            const downloadUrl = `https://tcgcsv.com/tcgplayer/79/${groupId}/ProductsAndPrices.csv`;
+            const filename = `${groupName}_Prices_${dateStr}.csv`;
+            const downloadUrl = `https://tcgcsv.com/tcgplayer/79/${group.groupId}/ProductsAndPrices.csv`;
 
-            await downloadAndSaveCSV(downloadUrl, filename);
+            try {
+                const filePath = await downloadAndSaveCSV(downloadUrl, filename);
+                downloadedFiles.push(filePath);
+            } catch (error) {
+                console.warn(`Failed to download group ${group.groupId}: ${error.message}`);
+            }
         }
+
+        const mergedFileName = `Prices_${dateTimeStr}.csv`;
+        const mergedFilePath = path.join(RESULTS_DIR, mergedFileName);
+
+        console.log(mergedFilePath);
+        
+        if (downloadedFiles.length === 0) {
+            console.warn('No CSV files to merge. Exiting.');
+            return;
+        }
+        await mergeCSVFiles(downloadedFiles, mergedFilePath);
     } else {
-        const groupList = await fetch(API_URL).then(res => res.json());
-        if (groupList && groupList.results.length > 0) {
-            displayAndPrompt(groupList.results);
-        } else {
-            console.log('No results found.');
-        }
+        displayAndPrompt(groupList.results);
     }
 })();
+
+
+// Merge multiple CSV files into one
+async function mergeCSVFiles(filePaths, outputFilePath) {
+    const allRows = new Map(); // key = `${productId}_${groupId}`, value = row object
+    const allColumns = new Set(); // Collect all unique columns
+
+    for (const file of filePaths) {
+        await new Promise((resolve, reject) => {
+            fs.createReadStream(file)
+                .pipe(csvParser())
+                .on('headers', headers => {
+                    headers.forEach(header => allColumns.add(header));
+                })
+                .on('data', row => {
+                    const key = `${row.productId}_${row.groupId}`;
+                    allRows.set(key, row); // Last row with same key wins
+                })
+                .on('end', resolve)
+                .on('error', reject);
+        });
+    }
+
+    const orderedColumns = Array.from(allColumns);
+
+    const writeStream = fs.createWriteStream(outputFilePath);
+    writeStream.write(orderedColumns.join(',') + '\n');
+
+    for (const row of allRows.values()) {
+        const line = orderedColumns.map(col => `"${(row[col] ?? '').replace(/"/g, '""')}"`).join(',') + '\n';
+        writeStream.write(line);
+    }
+
+    writeStream.end();
+    console.log(`Merged and normalized CSV saved to ${outputFilePath}`);
+}
